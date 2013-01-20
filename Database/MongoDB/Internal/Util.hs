@@ -29,8 +29,9 @@ import Data.Text (Text)
 
 import qualified Data.Text as T
 
-deriving instance Show PortID
-deriving instance Eq PortID
+-- Network-2.4.1.0 already derives Show and Eq instances for PortID
+-- deriving instance Show PortID
+-- deriving instance Eq PortID
 deriving instance Ord PortID
 
 -- | MonadIO with extra Applicative and Functor superclasses
