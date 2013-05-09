@@ -29,7 +29,7 @@ module Database.MongoDB.Query (
     Projector, Limit, Order, BatchSize,
 	explain, find, findOne, fetch, count, distinct,
 	-- *** Cursor
-	Cursor, nextBatch, next, nextN, rest, closeCursor, isCursorClosed,
+	Cursor, nextBatch, next, nextN, rest, iterateCursor, closeCursor, isCursorClosed,
 	-- ** Group
 	Group(..), GroupKey(..), group,
 	-- ** MapReduce
@@ -564,6 +564,11 @@ next (Cursor fcol batchSize var) = modifyMVar var nextState where
 nextN :: (MonadIO m, MonadBaseControl IO m, Functor m) => Int -> Cursor -> Action m [Document]
 -- ^ Return next N documents or less if end is reached
 nextN n c = catMaybes <$> replicateM n (next c)
+
+iterateCursor :: (MonadIO m, MonadBaseControl IO m, Functor m) => (Document -> a -> Action m a) -> a -> Cursor -> Action m a
+-- ^ iteratively runs an action while consuming documents
+iterateCursor f st0 c = next c >>= maybe (closeCursor c >> return st0) go
+        where go doc = f doc st0 >>= (\st1 -> iterateCursor f st1 c)
 
 rest :: (MonadIO m, MonadBaseControl IO m, Functor m) => Cursor -> Action m [Document]
 -- ^ Return remaining documents in query result
