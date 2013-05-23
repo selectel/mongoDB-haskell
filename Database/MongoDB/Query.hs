@@ -30,6 +30,8 @@ module Database.MongoDB.Query (
 	explain, find, findOne, fetch, count, distinct,
 	-- *** Cursor
 	Cursor, nextBatch, next, nextN, rest, closeCursor, isCursorClosed,
+	-- ** Aggregate
+	Pipeline, aggregate,
 	-- ** Group
 	Group(..), GroupKey(..), group,
 	-- ** MapReduce
@@ -579,6 +581,19 @@ isCursorClosed :: (MonadIO m, MonadBase IO m) => Cursor -> Action m Bool
 isCursorClosed (Cursor _ _ var) = do
 		Batch _ cid docs <- fulfill =<< readMVar var
 		return (cid == 0 && null docs)
+
+-- ** Aggregate
+
+type Pipeline = [Document]
+-- ^ The Aggregate Pipeline
+
+aggregate :: MonadIO' m => Collection -> Pipeline -> Action m [Document]
+-- ^ Runs an aggregate and unpacks the result. See <http://docs.mongodb.org/manual/core/aggregation/> for details.
+aggregate aColl agg = do
+	response <- runCommand ["aggregate" =: aColl, "pipeline" =: agg]
+	case true1 "ok" response of
+		True  -> lookup "result" response
+		False -> fail $ "aggregate: Server response was\n" ++ show response
 
 -- ** Group
 
