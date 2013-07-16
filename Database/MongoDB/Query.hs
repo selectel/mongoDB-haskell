@@ -71,6 +71,7 @@ import Data.Bson (Document, Field(..), Label, Val, Value(String, Doc, Bool),
                   Javascript, at, valueAt, lookup, look, genObjectId, (=:),
                   (=?))
 import Data.Text (Text)
+import Data.Monoid (mappend)
 import qualified Data.Text as T
 
 import Database.MongoDB.Internal.Protocol (Reply(..), QueryOption(..),
@@ -450,21 +451,26 @@ findAndModify (Query {
   , project = project
   , sort = sort
   }) updates = do
-  result <- runCommand [
-     "findAndModify" := String collection
-   , "new"    := Bool True -- return updated document, not original document
-   , "query"  := Doc sel
-   , "update" := Doc updates
-   , "fields" := Doc project
-   , "sort"   := Doc sort
-   ]
-  return $ case findErr result of
-    Nothing -> case lookup "value" result of
-      Nothing -> Left "findAndModify: no document found (value field was empty)"
-      Just doc -> Right doc
-    Just e -> Left e
-    where
-      findErr result = lookup "err" (at "lastErrorObject" result)
+    result <- runCommand
+        [ "findAndModify" := String collection
+        , "new"    := Bool True -- return updated document, not original document
+        , "query"  := Doc sel
+        , "update" := Doc updates
+        , "fields" := Doc project
+        , "sort"   := Doc sort
+        ]
+    return $ case lookupErr result of
+        Just e -> Left e
+        Nothing -> case lookup "value" result of
+            Just doc -> Right doc
+            Nothing ->
+              Left "findAndModify: no document found (value field was empty)"
+  where
+    -- Nothing means ok, Just is the error message
+    lookupErr result = case lookup "lastErrorObject" result of
+        Just err -> lookup "err" err
+        Nothing -> Just $ "findAndModify: document not found in " `mappend`
+            show collection `mappend` "from query: " `mappend` show sel
 
 explain :: (MonadIO m) => Query -> Action m Document
 -- ^ Return performance stats of query execution
