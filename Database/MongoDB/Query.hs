@@ -404,21 +404,23 @@ fetch :: (MonadIO m) => Query -> Action m Document
 -- ^ Same as 'findOne' except throw 'DocNotFound' if none match
 fetch q = findOne q >>= maybe (liftIO $ throwIO $ DocNotFound $ selection q) return
 
--- | runs the findAndModify command.
--- Returns a single updated document (new option is set to true).
--- Currently this API does not allow setting the remove option
+-- | Run the @findAndModify@ command and return an error message or the document
+-- found (determined by the @Bool@ parameter).
+-- See <http://docs.mongodb.org/manual/reference/command/findAndModify/> for
+-- details.
 findAndModify :: MonadIO m
-              => Query
-              -> Document -- ^ updates
+              => Bool -- ^ Return the modified document (@True@) or the original (@False@)
+              -> Query
+              -> Modifier
               -> Action m (Either String Document)
-findAndModify (Query {
+findAndModify returnModified (Query {
     selection = Select sel collection
   , project = project
   , sort = sort
   }) updates = do
     result <- runCommand
         [ "findAndModify" := String collection
-        , "new"    := Bool True -- return updated document, not original document
+        , "new"    := Bool returnModified
         , "query"  := Doc sel
         , "update" := Doc updates
         , "fields" := Doc project
